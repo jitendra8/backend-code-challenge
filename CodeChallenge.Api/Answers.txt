@@ -1,0 +1,16 @@
+﻿Answer 1:
+1.	Standard HTTP Status Codes: Used appropriate status codes (200 OK, 201 Created, 204 No Content, 404 Not Found) following REST conventions.
+2.	CreatedAtAction Response: For POST, returned CreatedAtAction with location header pointing to the newly created resource.
+3.	Logging: Added structured logging at key points for observability and debugging.
+4.	Null Checking: Implemented proper null checks before operations to return 404 when resources don't exist.
+5.	Organization Scoping: Ensured all operations respect the organizationId to maintain proper data isolation.
+
+Answer 2:
+1.	Input Validation: Add data annotations or FluentValidation for request validation
+2.	Error Handling: Implement global exception handling middleware
+3.	Rate Limiting: Add throttling to prevent abuse
+4.	Pagination: Implement pagination for the GetAll endpoint
+5.	Caching: Add response caching for frequently accessed data
+6.	API Versioning: Proper versioning strategy beyond URL-based versioning
+7.	Health Checks: Add health check endpoints
+8.	OpenAPI Documentation: Enhanced Swagger documentation with examples and descriptions
