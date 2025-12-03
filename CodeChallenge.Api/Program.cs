@@ -1,3 +1,4 @@
+using CodeChallenge.Api.Logic;
 using CodeChallenge.Api.Repositories;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -8,6 +9,9 @@ builder.Services.AddSwaggerGen();
 
 // Register repositories
 builder.Services.AddSingleton<IMessageRepository, InMemoryMessageRepository>();
+
+// Register business logic
+builder.Services.AddScoped<IMessageLogic, MessageLogic>();
 
 var app = builder.Build();
 

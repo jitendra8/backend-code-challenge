@@ -14,3 +14,25 @@ Answer 2:
 6.	API Versioning: Proper versioning strategy beyond URL-based versioning
 7.	Health Checks: Add health check endpoints
 8.	OpenAPI Documentation: Enhanced Swagger documentation with examples and descriptions
+
+Answer 3:
+1.	Separation of Concerns: Created ValidateCreateRequest and ValidateUpdateRequest methods to keep validation logic centralized and reusable.
+2.	Consistent Error Format: Used Dictionary<string, string[]> to return field-specific errors, making it easy for clients to map errors to form fields.
+3.	Business Rule Enforcement:
+•	Title uniqueness: Checked via repository before create/update operations
+•	Length validations: Applied at the validation method level
+•	Active status check: Enforced before update/delete operations
+•	Automatic UpdatedAt: Handled by the repository layer
+4.	Result Pattern: Used discriminated union-style results for type-safe error handling without exceptions.
+
+Answer 4:
+1.	FluentValidation: Replace manual validation with FluentValidation for better maintainability and testability.
+2.	Domain Events: Implement domain events for message creation/updates to decouple side effects.
+3.	Error Logging: Add comprehensive error logging with correlation IDs for traceability.
+4.	Validation Attributes: Consider data annotations on request models for basic validation.
+5.	Soft Deletes: Instead of hard deletes, implement soft deletes with a DeletedAt timestamp.
+6.	Transaction Management: Add unit of work pattern for complex operations spanning multiple repositories.
+7.	Performance: Add caching for frequently accessed messages and implement pagination.
+8.	Security: Add authorization checks to ensure users can only access their organization's messages.
+9.	Audit Trail: Track who created/modified messages with CreatedBy and UpdatedBy fields.
+10.	Rate Limiting: Implement rate limiting per organization to prevent abuse.
