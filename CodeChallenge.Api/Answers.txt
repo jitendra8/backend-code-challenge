@@ -36,3 +36,33 @@ Answer 4:
 8.	Security: Add authorization checks to ensure users can only access their organization's messages.
 9.	Audit Trail: Track who created/modified messages with CreatedBy and UpdatedBy fields.
 10.	Rate Limiting: Implement rate limiting per organization to prevent abuse.
+
+Answer 5:
+Testing Strategy:
+1.	AAA Pattern: All tests follow the Arrange-Act-Assert pattern for clarity and consistency.
+2.	Mocking: Used Moq to mock IMessageRepository to isolate the business logic from data access concerns.
+3.	Fluent Assertions: Used FluentAssertions for more readable and expressive assertions.
+4.	Comprehensive Coverage: Covered all public methods with both happy path and error scenarios.
+5.	Theory Tests: Used [Theory] and [InlineData] for parameterized tests to cover multiple validation scenarios efficiently.
+Tools Chosen:
+•	xUnit: Modern, extensible testing framework with excellent .NET Core support
+•	Moq: Popular mocking library with simple, fluent API
+•	FluentAssertions: Makes assertions more readable and provides better error messages
+
+Answer 6:
+1.	Concurrency Tests: Test concurrent updates to the same message
+2.	Performance Tests: Validate performance with large datasets
+3.	Boundary Value Tests: Test exact boundary values (e.g., exactly 10 characters, exactly 1000 characters)
+4.	Integration Tests: Test with actual repository implementation
+5.	Edge Cases:
+•	Special characters in title/content (SQL injection, XSS attempts)
+•	Unicode and emoji handling
+•	Very long organization IDs
+•	Null organization IDs
+6.	Multi-organization Isolation: Verify messages from one organization can't be accessed by another
+7.	Audit Trail: Verify CreatedAt and UpdatedAt are set correctly
+8.	Error Recovery: Test repository failures and how they're handled
+9.	Case Sensitivity: Test title uniqueness with different casing
+10.	Whitespace Handling: Test titles with leading/trailing whitespace
+11.	Soft Delete Scenarios: If implementing soft deletes
+12.	Batch Operations: If implementing bulk create/update/delete
