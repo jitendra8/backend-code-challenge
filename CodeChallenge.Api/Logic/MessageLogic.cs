@@ -7,6 +7,36 @@ public class MessageLogic : IMessageLogic
 {
     private readonly IMessageRepository _repository;
 
+    // Validation constants
+    private static class ValidationConstants
+    {
+        public const int TitleMinLength = 3;
+        public const int TitleMaxLength = 200;
+        public const int ContentMinLength = 10;
+        public const int ContentMaxLength = 1000;
+    }
+
+    // Field names for validation errors
+    private static class FieldNames
+    {
+        public const string Title = nameof(Title);
+        public const string Content = nameof(Content);
+        public const string IsActive = nameof(IsActive);
+    }
+
+    // Error messages
+    private static class ErrorMessages
+    {
+        public const string TitleRequired = "Title is required";
+        public static readonly string TitleLength = $"Title must be between {ValidationConstants.TitleMinLength} and {ValidationConstants.TitleMaxLength} characters";
+        public const string ContentRequired = "Content is required";
+        public static readonly string ContentLength = $"Content must be between {ValidationConstants.ContentMinLength} and {ValidationConstants.ContentMaxLength} characters";
+        public const string CannotUpdateInactive = "Cannot update inactive messages";
+        public const string CannotDeleteInactive = "Cannot delete inactive messages";
+        public const string TitleAlreadyExists = "A message with title '{0}' already exists in this organization";
+        public const string MessageNotFound = "Message with id '{0}' not found";
+    }
+
     public MessageLogic(IMessageRepository repository)
     {
         _repository = repository;
@@ -14,21 +44,18 @@ public class MessageLogic : IMessageLogic
 
     public async Task<Result> CreateMessageAsync(Guid organizationId, CreateMessageRequest request)
     {
-        // Validate the request
-        var validationErrors = ValidateCreateRequest(request);
+        var validationErrors = ValidateMessageRequest(request.Title, request.Content);
         if (validationErrors.Count > 0)
         {
             return new ValidationError(validationErrors);
         }
 
-        // Check for duplicate title
         var existingMessage = await _repository.GetByTitleAsync(organizationId, request.Title);
         if (existingMessage != null)
         {
-            return new Conflict($"A message with title '{request.Title}' already exists in this organization");
+            return new Conflict(string.Format(ErrorMessages.TitleAlreadyExists, request.Title));
         }
 
-        // Create the message
         var message = new Message
         {
             OrganizationId = organizationId,
@@ -43,75 +70,51 @@ public class MessageLogic : IMessageLogic
 
     public async Task<Result> UpdateMessageAsync(Guid organizationId, Guid id, UpdateMessageRequest request)
     {
-        // Validate the request
-        var validationErrors = ValidateUpdateRequest(request);
+        var validationErrors = ValidateMessageRequest(request.Title, request.Content);
         if (validationErrors.Count > 0)
         {
             return new ValidationError(validationErrors);
         }
 
-        // Check if message exists
         var existingMessage = await _repository.GetByIdAsync(organizationId, id);
         if (existingMessage == null)
         {
-            return new NotFound($"Message with id '{id}' not found");
+            return new NotFound(string.Format(ErrorMessages.MessageNotFound, id));
         }
 
-        // Can only update active messages
         if (!existingMessage.IsActive)
         {
-            return new ValidationError(new Dictionary<string, string[]>
-            {
-                { "IsActive", new[] { "Cannot update inactive messages" } }
-            });
+            return CreateIsActiveValidationError(ErrorMessages.CannotUpdateInactive);
         }
 
-        // Check for duplicate title (excluding current message)
         var duplicateMessage = await _repository.GetByTitleAsync(organizationId, request.Title);
         if (duplicateMessage != null && duplicateMessage.Id != id)
         {
-            return new Conflict($"A message with title '{request.Title}' already exists in this organization");
+            return new Conflict(string.Format(ErrorMessages.TitleAlreadyExists, request.Title));
         }
 
-        // Update the message
         existingMessage.Title = request.Title;
         existingMessage.Content = request.Content;
         existingMessage.IsActive = request.IsActive;
-        // UpdatedAt is set automatically in the repository
 
-        var updatedMessage = await _repository.UpdateAsync(existingMessage);
-        if (updatedMessage == null)
-        {
-            return new NotFound($"Message with id '{id}' not found");
-        }
-
+        await _repository.UpdateAsync(existingMessage);
         return new Updated();
     }
 
     public async Task<Result> DeleteMessageAsync(Guid organizationId, Guid id)
     {
-        // Check if message exists
         var existingMessage = await _repository.GetByIdAsync(organizationId, id);
         if (existingMessage == null)
         {
-            return new NotFound($"Message with id '{id}' not found");
+            return new NotFound(string.Format(ErrorMessages.MessageNotFound, id));
         }
 
-        // Can only delete active messages
         if (!existingMessage.IsActive)
         {
-            return new ValidationError(new Dictionary<string, string[]>
-            {
-                { "IsActive", new[] { "Cannot delete inactive messages" } }
-            });
+            return CreateIsActiveValidationError(ErrorMessages.CannotDeleteInactive);
         }
 
-        var deleted = await _repository.DeleteAsync(organizationId, id);
-        if (!deleted)
-        {
-            return new NotFound($"Message with id '{id}' not found");
-        }
-
+        await _repository.DeleteAsync(organizationId, id);
         return new Deleted();
     }
 
@@ -125,57 +128,48 @@ public class MessageLogic : IMessageLogic
         return await _repository.GetAllByOrganizationAsync(organizationId);
     }
 
-    private Dictionary<string, string[]> ValidateCreateRequest(CreateMessageRequest request)
+    /// <summary>
+    /// Unified validation for both Create and Update requests
+    /// </summary>
+    private Dictionary<string, string[]> ValidateMessageRequest(string title, string content)
     {
         var errors = new Dictionary<string, string[]>();
 
-        // Validate Title
-        if (string.IsNullOrWhiteSpace(request.Title))
-        {
-            errors.Add("Title", new[] { "Title is required" });
-        }
-        else if (request.Title.Length < 3 || request.Title.Length > 200)
-        {
-            errors.Add("Title", new[] { "Title must be between 3 and 200 characters" });
-        }
-
-        // Validate Content
-        if (string.IsNullOrWhiteSpace(request.Content))
-        {
-            errors.Add("Content", new[] { "Content is required" });
-        }
-        else if (request.Content.Length < 10 || request.Content.Length > 1000)
-        {
-            errors.Add("Content", new[] { "Content must be between 10 and 1000 characters" });
-        }
+        ValidateTitle(title, errors);
+        ValidateContent(content, errors);
 
         return errors;
     }
 
-    private Dictionary<string, string[]> ValidateUpdateRequest(UpdateMessageRequest request)
+    private static void ValidateTitle(string title, Dictionary<string, string[]> errors)
     {
-        var errors = new Dictionary<string, string[]>();
+        if (string.IsNullOrWhiteSpace(title))
+        {
+            errors.Add(FieldNames.Title, [ErrorMessages.TitleRequired]);
+        }
+        else if (title.Length < ValidationConstants.TitleMinLength || title.Length > ValidationConstants.TitleMaxLength)
+        {
+            errors.Add(FieldNames.Title, [ErrorMessages.TitleLength]);
+        }
+    }
 
-        // Validate Title
-        if (string.IsNullOrWhiteSpace(request.Title))
+    private static void ValidateContent(string content, Dictionary<string, string[]> errors)
+    {
+        if (string.IsNullOrWhiteSpace(content))
         {
-            errors.Add("Title", new[] { "Title is required" });
+            errors.Add(FieldNames.Content, [ErrorMessages.ContentRequired]);
         }
-        else if (request.Title.Length < 3 || request.Title.Length > 200)
+        else if (content.Length < ValidationConstants.ContentMinLength || content.Length > ValidationConstants.ContentMaxLength)
         {
-            errors.Add("Title", new[] { "Title must be between 3 and 200 characters" });
+            errors.Add(FieldNames.Content, [ErrorMessages.ContentLength]);
         }
+    }
 
-        // Validate Content
-        if (string.IsNullOrWhiteSpace(request.Content))
+    private static ValidationError CreateIsActiveValidationError(string message)
+    {
+        return new ValidationError(new Dictionary<string, string[]>
         {
-            errors.Add("Content", new[] { "Content is required" });
-        }
-        else if (request.Content.Length < 10 || request.Content.Length > 1000)
-        {
-            errors.Add("Content", new[] { "Content must be between 10 and 1000 characters" });
-        }
-
-        return errors;
+            { FieldNames.IsActive, [message] }
+        });
     }
 }

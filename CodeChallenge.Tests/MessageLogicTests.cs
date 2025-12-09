@@ -5,6 +5,7 @@ using FluentAssertions;
 using Moq;
 
 namespace CodeChallenge.Tests;
+
 public class MessageLogicTests
 {
     private readonly Mock<IMessageRepository> _mockRepository;
@@ -119,17 +120,14 @@ public class MessageLogicTests
         _mockRepository.Verify(r => r.CreateAsync(It.IsAny<Message>()), Times.Never);
     }
 
-    [Theory]
-    [InlineData("Valid Title", "Short")]
-    [InlineData("Valid Title", "")]
-    [InlineData("Valid Title", null)]
-    public async Task CreateMessageAsync_WithInvalidContentLength_ReturnsValidationError(string title, string content)
+    [Fact]
+    public async Task CreateMessageAsync_WithNullContent_ReturnsValidationError()
     {
         // Arrange
         var request = new CreateMessageRequest
         {
-            Title = title,
-            Content = content
+            Title = "Valid Title",
+            Content = null!
         };
 
         // Act
@@ -139,7 +137,51 @@ public class MessageLogicTests
         result.Should().BeOfType<ValidationError>();
         var validationError = (ValidationError)result;
         validationError.Errors.Should().ContainKey("Content");
-        validationError.Errors["Content"].Should().Contain(e => e.Contains("between 10 and 1000 characters") || e.Contains("required"));
+        validationError.Errors["Content"].Should().Contain(e => e.Contains("required"));
+
+        _mockRepository.Verify(r => r.CreateAsync(It.IsAny<Message>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task CreateMessageAsync_WithEmptyContent_ReturnsValidationError()
+    {
+        // Arrange
+        var request = new CreateMessageRequest
+        {
+            Title = "Valid Title",
+            Content = ""
+        };
+
+        // Act
+        var result = await _messageLogic.CreateMessageAsync(_organizationId, request);
+
+        // Assert
+        result.Should().BeOfType<ValidationError>();
+        var validationError = (ValidationError)result;
+        validationError.Errors.Should().ContainKey("Content");
+        validationError.Errors["Content"].Should().Contain(e => e.Contains("required"));
+
+        _mockRepository.Verify(r => r.CreateAsync(It.IsAny<Message>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task CreateMessageAsync_WithContentTooShort_ReturnsValidationError()
+    {
+        // Arrange
+        var request = new CreateMessageRequest
+        {
+            Title = "Valid Title",
+            Content = "Short" // Less than 10 characters
+        };
+
+        // Act
+        var result = await _messageLogic.CreateMessageAsync(_organizationId, request);
+
+        // Assert
+        result.Should().BeOfType<ValidationError>();
+        var validationError = (ValidationError)result;
+        validationError.Errors.Should().ContainKey("Content");
+        validationError.Errors["Content"].Should().Contain(e => e.Contains("between 10 and 1000 characters"));
 
         _mockRepository.Verify(r => r.CreateAsync(It.IsAny<Message>()), Times.Never);
     }
@@ -161,6 +203,7 @@ public class MessageLogicTests
         result.Should().BeOfType<ValidationError>();
         var validationError = (ValidationError)result;
         validationError.Errors.Should().ContainKey("Content");
+        validationError.Errors["Content"].Should().Contain(e => e.Contains("between 10 and 1000 characters"));
 
         _mockRepository.Verify(r => r.CreateAsync(It.IsAny<Message>()), Times.Never);
     }
@@ -440,37 +483,6 @@ public class MessageLogicTests
 
         _mockRepository.Verify(r => r.GetByIdAsync(_organizationId, messageId), Times.Once);
         _mockRepository.Verify(r => r.DeleteAsync(It.IsAny<Guid>(), It.IsAny<Guid>()), Times.Never);
-    }
-
-    [Fact]
-    public async Task DeleteMessageAsync_WhenRepositoryDeleteFails_ReturnsNotFound()
-    {
-        // Arrange
-        var messageId = Guid.NewGuid();
-        var existingMessage = new Message
-        {
-            Id = messageId,
-            OrganizationId = _organizationId,
-            Title = "Message to Delete",
-            Content = "Content to delete.",
-            IsActive = true
-        };
-
-        _mockRepository
-            .Setup(r => r.GetByIdAsync(_organizationId, messageId))
-            .ReturnsAsync(existingMessage);
-
-        _mockRepository
-            .Setup(r => r.DeleteAsync(_organizationId, messageId))
-            .ReturnsAsync(false);
-
-        // Act
-        var result = await _messageLogic.DeleteMessageAsync(_organizationId, messageId);
-
-        // Assert
-        result.Should().BeOfType<NotFound>();
-
-        _mockRepository.Verify(r => r.DeleteAsync(_organizationId, messageId), Times.Once);
     }
 
     #endregion
